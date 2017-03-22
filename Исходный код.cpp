@@ -47,24 +47,57 @@ int main(int args, char **argv)
 	while (1)
 	{
 		int SlaveSocket = accept(MasterSocket, 0, 0); /*приняли соединение, появился новый сокет*/
-		printf("accept %d",SlaveSocket);
-		printf("\n");
 		printf("Клиент подключился\n");
 
-		/*создадим буфер из пяти нулей (байт)*/
-		/*читаем и выводим на экран соединения которые прочитали*/
-		char Buffer[1024]; /*char Buffer[1024]; char Buffer[5] = {0, 0, 0, 0, 0};*/
-
-		//int len = recv(SlaveSocket, Buffer, sizeof(int32_t), NULL); /*принимаем известной длины 32 бита длину сообщения*/
-
-		int res = recv(SlaveSocket, Buffer, 4, NULL);
+		/*ПЕРЕДАЕМ ДЛИНУ СООБЩЕНИЯ*/
 		
-		send(SlaveSocket, Buffer, 4, NULL);
+		int32_t messageLength = 0; //32-разрядное целое число из 4 байтов, длина собщения
+
+		char messageBuffer[1000]; //Массив из 1000 chars, т.е. байтов
+
+		//Передаем в recv адрес переменной messageLength и ее длину в памяти
+		//Инструкция принять 4 байта и записать по адресу messageLength
+		size_t receivedLength = recv(SlaveSocket, (char *)&messageLength, sizeof(messageLength), NULL);
+
+		//Проверяем длину сообщения. Клиент обязан прислать sizeof(messageLength) байт.
+		if (receivedLength != sizeof(messageLength))
+		{
+			//выдаем ошибку и закрываемся
+			exit(1);
+		}
+
+		/*ПРИНИМАЕМ В БУФЕР САМО СООБЩЕНИЕ*/
+
+		//Проверяем, чтобы наше сообщение не вылезло за границу буфера
+		if (messageLength > sizeof(messageBuffer) - 1)
+		{
+			// По сети должна прийти строка, а строки, предназначенные для печати,
+			// должны завершаться нулевым байтом. Надо оставить место для него, поэтому тут минус 1.
+			messageLength = sizeof(messageBuffer) - 1;
+		}
+
+		//получена длина
+		receivedLength = recv(SlaveSocket, messageBuffer, messageLength, NULL);
+
+		// Клиент должен прислать столько, сколько обещал. Обрезанные сообщения не нужны
+		if (receivedLength != messageLength)
+			exit(0);
+
+		// За концом строки надо поставить нулевой байт, если хотим ее распечатать
+		messageBuffer[messageLength] = 0;
+		printf("Полученная строка: '%s'\n", messageBuffer);
+
+		// Теперь передаем ее обратно
+
+		// Передаем счетчик длины фиксированного размера - sizeof(messageLength), т.е. 4 байта
+		send(SlaveSocket, (char *)&messageLength, sizeof(messageLength), NULL); 
+
+		// Передаем строку, ровно столько байт, сколько приняли
+		send(SlaveSocket, messageBuffer, messageLength, NULL);
+
 		shutdown(SlaveSocket, SD_BOTH);
 		closesocket(SlaveSocket);
 
-		printf("Сообщение: ");
-		printf("%s\n", Buffer);
 		getchar ();
 	}
 
