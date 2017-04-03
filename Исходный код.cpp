@@ -8,7 +8,7 @@
 
 #include <stdint.h> //для типа int32_t 
 
-int Users[10]; /*v3 коллекция сокетов, массив в котором подключенные пользователи*/
+int Users[10]; /*массив в котором подключенные пользователи*/
 int ClientCount = 0; /*v3 кол-во подключаемых пользователей, изначально 0*/
 
 //функция для проверки на ошибки
@@ -21,7 +21,6 @@ void CheckForError (int result)
 		exit(0);
 	}
 }
-
 
 void SendMessageToClient (int cl)
 {
@@ -104,10 +103,9 @@ int main(int args, char **argv)
 	{
 		if (int SlaveSocket = accept(MasterSocket, 0, 0)){ /*приняли соединение, появился новый сокет*/
 			printf("Клиент подключился\n");
-			printf("*eго сокет: %d \n", SlaveSocket); //v3
-			printf("*клиент № : %d \n", ClientCount); //v3
+			printf("*клиент № : %d \n", ClientCount);
 
-			Users[ClientCount] = SlaveSocket; //v3/*сохраняем сокет подключаемого клиента*/
+			Users[ClientCount] = SlaveSocket; /*сохраняем сокет подключаемого клиента*/
 			ClientCount++; /*увеличиваем на 1*/
 
 			CreateThread(0, 0, (LPTHREAD_START_ROUTINE)SendMessageToClient, (LPVOID)(ClientCount-1), 0, 0); //поток
