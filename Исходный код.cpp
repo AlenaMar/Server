@@ -1,32 +1,20 @@
-#include <stdio.h> /*чтобы писать на экран*/
 #pragma comment(lib,"Ws2_32.lib")
 
 #include <sys/types.h>
 #include <WinSock2.h>
-#include <Ws2tcpip.h> 
-#include <locale.h>
+#include <Ws2tcpip.h>
 
-#include <stdint.h> //для типа int32_t 
 #include <ctime>
 #include <iostream>
+#include <vector>
 #include <string>
 #include <math.h>
 
-int ClientCount = 0; /*кол-во подключаемых пользователей, изначально 0*/
-
-//массив структур, в котором для каждого пользователя будет храниться сокет соединения и идентификатор потока
-struct ClientInfo
-{
-	int socket; /*сокет подключаемого пользователя*/
-	int id_thread; /*идентификатор потока для клиента*/
-};
-struct ClientInfo clients[100]; //массив из этих структур
-
-
 //функция для проверки на ошибки
-void CheckForError (int result)
+void CheckForError(int result)
 {
-    if (result != 0)
+
+	if (result != 0)
 	{
 		printf("FALL!!! CheckForError result = %d", result);
 		printf("\n");
@@ -34,79 +22,38 @@ void CheckForError (int result)
 	}
 }
 
-//функция для передачи длины сообщения, затем его содержимого
-void SendMessageToClient (int cl)
+class Client
 {
-	/*ПЕРЕДАЕМ ДЛИНУ СООБЩЕНИЯ*/
-		
-		int32_t messageLength = 0; //32-разрядное целое число из 4 байтов, длина собщения
+private:
+	int ID_thread;
+	SOCKET Socket;
+public:
+	Client(SOCKET * in, int key) :Socket(*in), ID_thread(key) {}
+	Client() {}
+	SOCKET getsock() { return Socket; }
+	int getID() { return ID_thread; }
+	void changeID(int n) { ID_thread = n; }
+};
 
-		char messageBuffer[1000]; //Массив из 1000 chars, т.е. байтов
+//Сокет для подключения, хранения подключенных и для прослушки + подсчет количества подключенных 
+SOCKET Connect;
+SOCKET Listen;
+int Count = 0; /*кол-во подключаемых пользователей, изначально 0*/
 
-		//Передаем в recv адрес переменной messageLength и ее длину в памяти
-		//Инструкция принять 4 байта и записать по адресу messageLength
-		size_t receivedLength = recv(clients[cl].socket, (char *)&messageLength, sizeof(messageLength), NULL);
+std::vector<Client> Connection(100);
 
-		//Проверяем длину сообщения. Клиент обязан прислать sizeof(messageLength) байт.
-		if (receivedLength != sizeof(messageLength))
-		{
-			//выдаем ошибку и закрываемся
-			exit(1);
-		}
-
-		/*ПРИНИМАЕМ В БУФЕР САМО СООБЩЕНИЕ*/
-
-		//Проверяем, чтобы наше сообщение не вылезло за границу буфера
-		if (messageLength > sizeof(messageBuffer) - 1)
-		{
-			// По сети должна прийти строка, а строки, предназначенные для печати,
-			// должны завершаться нулевым байтом. Надо оставить место для него, поэтому тут минус 1.
-			messageLength = sizeof(messageBuffer) - 1;
-		}
-
-		//получена длина
-		receivedLength = recv(clients[cl].socket, messageBuffer, messageLength, NULL);
-
-		// Клиент должен прислать столько, сколько обещал. Обрезанные сообщения не нужны
-		if (receivedLength != messageLength)
-			exit(0);
-
-		// За концом строки надо поставить нулевой байт, если хотим ее распечатать
-		messageBuffer[messageLength] = 0;
-		printf("      Полученная строка: '%s'\n", messageBuffer);
-
-		// Теперь передаем ее обратно
-
-		for (int i = 0; i < ClientCount; i++)
-		{
-			if (exit(messageBuffer))
-			{
-				out_m(messageBuffer);
-				strcat_s(messageBuffer, " покинул(а) чат");
-				for (int i = 0; i <= ClientCount; i++)
-				{
-					if (i == clients[cl].socket)continue;
-					send(clients[cl].socket, messageBuffer, 512, NULL);
-				}
-				closesocket(clients[cl].socket);
-				decompres(clients[cl].socket);
-				ClientCount--;
-				break;
-			}
-			
-			// Передаем счетчик длины фиксированного размера - sizeof(messageLength), т.е. 4 байта
-			send(clients[i].socket, (char *)&messageLength, sizeof(messageLength), NULL); 
-
-			// Передаем строку, ровно столько байт, сколько приняли
-			send(clients[i].socket, messageBuffer, messageLength, NULL);
-
-			shutdown(clients[i].socket, SD_BOTH);
-			closesocket(clients[i].socket);
-		}
-		
+//Удаляет отключенных пользователей
+void decompres(int n)
+{
+	for (int i = n; i < Count - 1; i++)
+	{
+		Connection[i] = Connection[i + 1];
+		Connection[i].changeID(Connection[i].getID() - 1);
+	}
+	Connection[Count].~Client();
 }
 
-//Функция для выхода
+//Функция для отправки-приема сообщений, принимает сообщение и рассылает всем подключенным пользователям
 bool exit(char * out)
 {
 	int i = 0;
@@ -136,15 +83,41 @@ void out_m(char * msg)
 		msg[j] = name[j];
 }
 
-//Функция для отключения
-void decompres(int n)
+void SendM(int ID)
 {
-	for (int i = n; i < ClientCount - 1; i++)
+	setlocale(LC_ALL, "Russian");
+	for (;; Sleep(75))
 	{
-		clients[i].socket = clients[i + 1].socket;
-		clients[i].socket = clients[i].socket - 1;
+		char msg[512];
+		ZeroMemory(msg, sizeof(char) * 512);
+		int iResult = recv(Connection[ID].getsock(), msg, 512, NULL);
+		std::cout << msg << std::endl;
+		if (exit(msg))
+		{
+			out_m(msg);
+			strcat_s(msg, " покинул(а) чат");
+			for (int i = 0; i <= Count; i++)
+			{
+				if (i == ID)continue;
+				send(Connection[i].getsock(), msg, 512, NULL);
+			}
+			closesocket(Connection[ID].getsock());
+			decompres(ID);
+			Count--;
+			break;
+		}
+		if (iResult>0)
+		{
+			for (int i = 0; i <= Count; i++)
+			{
+				if (i == ID)continue;
+				send(Connection[i].getsock(), msg, 512, NULL);
+			}
+		}
 	}
+	printf("%d покинул(а) чат\n", ID);
 }
+
 
 //выясняет, отлаживается ли вызывающий процесс (динамическая защита)
 void fastcall (int p)
@@ -158,14 +131,16 @@ void fastcall (int p)
 		printf("Нет отладчика...\n");
 }
 
-int main(int args, char **argv)
+
+
+int main()
 {
 	//для защиты ключом просим ввести ключ
 	setlocale(LC_ALL, "Russian");
 	float t1 = 0.568207;
 	char Key[20];
 	printf("Введите ключ: ");
-	gets(Key);
+	std::cin >> Key;
 
 	int pr = int(Key[0]);
 	for (int i = 1; i < strlen(Key); i++)
@@ -186,48 +161,49 @@ int main(int args, char **argv)
 	}
 
 	printf("Добро пожаловать в мастер создания сервера!\n");
-	WSAData ws;
-	WSAStartup(MAKEWORD(2, 2), &ws);
-	
-	int MasterSocket = socket(AF_INET/*IPv4*/, SOCK_STREAM /*TCP*/, IPPROTO_TCP); /*создали сокет*/
+	WSAData  ws;
+	WORD version = MAKEWORD(2, 2);
+	int MasterSocket = WSAStartup(version, &ws);
+	if (MasterSocket != 0)
+	{
+		return 0;
+	}
+	struct addrinfo hints;
+	struct addrinfo * result;
+	ZeroMemory(&hints, sizeof(hints));
 
-	struct sockaddr_in SockAddr;
-	struct sockaddr_in * result;
-	ZeroMemory(&SockAddr, sizeof(SockAddr));
-	SockAddr.sin_family = AF_INET;
-	SockAddr.sin_port = htonl(12345);
-	SockAddr.sin_addr.s_addr = INADDR_ANY; /*0.0.0.0*/
+	//Задание сокетов
+	hints.ai_family = AF_INET;
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
 
-	char iport[] = "";
-	char port[] = "";
 	//Установка ip и порта
 	printf("Введите ip-адрес: ");
-	gets(iport);
+	std::string iport; std::cin >> iport;
 	printf("Введите port : ");
-	gets(port);
+	std::string port; std::cin >> port;
+	getaddrinfo(iport.c_str(), port.c_str(), &hints, &result);
 
-	fastcall(bind(MasterSocket, (struct sockaddr *)(&SockAddr), sizeof(SockAddr)));
+	//Заполнение сокета listen
+	fastcall(Listen = socket(result->ai_family, result->ai_socktype, result->ai_protocol));//дин
+	fastcall(bind(Listen, result->ai_addr, result->ai_addrlen));//дин
+	fastcall(listen(Listen, SOMAXCONN));//дин
+	freeaddrinfo(result);
 
-	fastcall(listen(MasterSocket, SOMAXCONN)); /*слушаем сокет*/
-	printf("Ждем подключений...\n");
-
-	/*входим в бесконечный цикл*/
+	//Начало работы сервера
+	std::cout << "\nЖдём подключений..." << std::endl;
+	char c_connect[] = "*Клиент №";
 	while (1)
 	{
-		if (int SlaveSocket = accept(MasterSocket, 0, 0)){ /*приняли соединение, появился новый сокет*/
-						printf("   *Клиент №: %d подключился \n", ClientCount);
-
-			printf("      Сокет соединения: %d \n", SlaveSocket);
-			clients[ClientCount].socket = SlaveSocket;
-			clients[ClientCount].socket = SlaveSocket; /*сохраняем сокет подключаемого клиента*/
-			ClientCount++; /*увеличиваем на 1*/
-
-			CreateThread(0, 0, (LPTHREAD_START_ROUTINE)SendMessageToClient, (LPVOID)(ClientCount-1), 0, 0); //поток
-			clients[ClientCount].id_thread = GetCurrentThreadId(); //присваиваем идентификатор потока
-			printf("      Идентификатор потока: %d\n", clients[ClientCount].id_thread);
+		//проверка на получение сигнала от кого-нибудь
+		if (Connect = accept(Listen, NULL, NULL))
+		{
+			std::cout << c_connect << ' ' << Count << std::endl;
+			Connection[Count] = Client::Client(&Connect, Count);
+			Count++;
+			CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)SendM, (LPVOID)(Count - 1), NULL, NULL);
 		}
 	}
-
-	getchar ();
 	return 0;
 }
