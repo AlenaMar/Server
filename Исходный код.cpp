@@ -124,11 +124,11 @@ void fastcall (int p)
 {
 	bool check1 = IsDebuggerPresent();
 	if (check1) {
-		printf("Меня отлаживают...\n");
+		//printf("Меня отлаживают...\n");
 		exit(0);
 	}
-	else
-		printf("Нет отладчика...\n");
+	//else
+		//printf("Нет отладчика...\n");
 }
 
 
@@ -141,6 +141,12 @@ int main()
 	char Key[20];
 	printf("Введите ключ: ");
 	std::cin >> Key;
+
+	if (strlen(Key) > 8)
+	{
+		printf("Неверный ключ\n");
+		exit(0);
+	}
 
 	int pr = int(Key[0]);
 	for (int i = 1; i < strlen(Key); i++)
