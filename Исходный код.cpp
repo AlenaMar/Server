@@ -9,6 +9,7 @@
 #include <vector>
 #include <string>
 #include <math.h>
+#define PORT "12345"
 
 //функция для проверки на ошибки
 void CheckForError(int result)
@@ -124,7 +125,7 @@ void fastcall (int p)
 {
 	bool check1 = IsDebuggerPresent();
 	if (check1) {
-		//printf("Меня отлаживают...\n");
+		printf("Меня отлаживают...\n");
 		exit(0);
 	}
 	//else
@@ -166,7 +167,7 @@ int main()
 		exit(0);
 	}
 
-	printf("Добро пожаловать в мастер создания сервера!\n");
+	printf("Добро пожаловать!\n");
 	WSAData  ws;
 	WORD version = MAKEWORD(2, 2);
 	int MasterSocket = WSAStartup(version, &ws);
@@ -185,11 +186,12 @@ int main()
 	hints.ai_protocol = IPPROTO_TCP;
 
 	//Установка ip и порта
-	printf("Введите ip-адрес: ");
-	std::string iport; std::cin >> iport;
-	printf("Введите port : ");
-	std::string port; std::cin >> port;
-	getaddrinfo(iport.c_str(), port.c_str(), &hints, &result);
+	//printf("Введите ip-адрес: ");
+	//std::string iport; std::cin >> iport;
+	//printf("Введите port : ");
+	//std::string port; std::cin >> port;
+	//getaddrinfo(iport.c_str(), port.c_str(), &hints, &result);
+	getaddrinfo(NULL, PORT, &hints, &result);
 
 	//Заполнение сокета listen
 	fastcall(Listen = socket(result->ai_family, result->ai_socktype, result->ai_protocol));//дин
